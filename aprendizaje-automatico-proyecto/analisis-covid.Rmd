@@ -1,0 +1,791 @@
+---
+title: "Análisis Covid-19 México"
+author: "Porfirio Ángel Díaz Sánchez"
+date: "3 de julio de 2020"
+output:
+  pdf_document:
+    keep_tex: yes
+  #slidy_presentation: default
+---
+
+## Introducción
+
+La aparición del Covid-19 es uno de los mayores retos en materia de salud al que el mundo se ha enfrentado en los últimos años, tanto así que, en cuestión de meses, ha ocasionado muchos cambios en la vida cotidiana de las personas y se ha esparcido por muchos países alrededor del mundo.
+Si bien su nivel de mortalidad no es tan alto, dicha enfermedad  es muy contagiosa, por lo que los sistemas de salud corren el riesgo de sobresaturación, provocando que no sea posible atender a todos los pacientes de forma adecuada, y así mismo, aumentando los efectos negativos en la salud de las personas.
+
+## Marco teórico
+
+El aprendizaje automático o machine learning es una ciencia enfocada en crear sistemas que aprenden automáticamente a partir de los datos. Se relaciona estrechamente con la minería de datos, que consiste en la búsqueda de información útil en grandes bases de datos. Cabe destacar que la minería de datos involucra el uso de machine learning, pero no todo el machine learning involucra minería de datos [1].
+
+### Reglas de clasificación
+
+Este tipo de algoritmos representan el conocimiento por medio de sentencias if-else y son adecuadas para datos nominales.
+
+Las reglas de clasificación utilizan la heurística conocida como separa y conquistarás, que consiste en encontrar una regla que cubra un subconjunto de ejemplos, y los separa de los datos restantes. Estas acciones se van repitiendo hasta que todo el dataset haya sido cubierto [1].
+
+### KNN
+
+Es un algoritmo de clasificación de vecinos más cercanos, que clasifica registros no etiquetados asignándoles una clase de ejemplos similares, su funcionamiento consiste en buscar los k vecinos más cercanos de acuerdo a la similitud en las características de los datos.
+
+Cuando se aplica el algoritmo para datos nominales y faltantes, es necesario llevar a cabo procesamiento adicional.
+
+### Árboles de decisión
+
+Los árboles de decisión modelan las relaciones existentes entre las características por medio de estructuras de árbol y sus salidas, además de proporcionar una salida simple y legible para cualquier persona.
+
+Utilizan la heurística divide y conquistarás, que consiste en dividir los datos en subconjuntos, que se siguen dividiendo repetidamente hasta que el algoritmo determina que los datos son suficientemente homogéneos.
+
+### Naive Bayes
+
+Este algoritmo utiliza el Teorema de Bayes en problemas de clasificación, utiliza los datos de entrenamiento para el cálculo de la probabilidad de cada salida.
+
+Se aplica a problemas donde la información de muchos atributos debe ser considerada de manera simultánea para estimar la probabilidad de una salida [1].
+
+### Regresión Lineal
+
+Los métodos de regresión se utilizan para el tratamiento de datos numéricos, utilizan una variable dependiente (valor a predecir), y un conjunto de variables independientes (los predictores).
+
+El uso de datos categóricos requiere procesamiento adicional.
+
+## Obtención de los datos
+
+Por medio del sitio oficial de Datos Abiertos del Gobierno de la República, el gobierno mexicano pone al alcance de los ciudadanos diversos catálogos de datos digitales acerca de diversos temas de interés nacional para su libre consulta y análisis.
+
+La base de datos utilizada en el presente trabajo registra aspectos de salud, resultados de pruebas, evolución  de enfermedad, entre otras características, de los pacientes que presentaron síntomas de Covid-19 en México. Estos datos se utilizan con el objetivo de determinar los aspectos que influyen en que un paciente con síntomas de Covid-19, muera.
+
+```{r include=FALSE}
+# Importa librerías propias.
+source('lib/packages.R')
+
+# Configura más memoria para Java.
+
+options(java.parameters = "-Xmx16000m")
+
+# Instala paquetes necesarios en caso de no tenerlos.
+install_missing_packages(c(
+  'rJava',
+  'RWeka',
+  'purrr',
+  'jsonlite',
+  'lme4',
+  'pbkrtest',
+  'BradleyTerry2',
+  'car',
+  'lava',
+  'caret',
+  'C50',
+  'class',
+  'gmodels'
+))
+
+# importa librerías
+library(caret)
+library(purrr)
+library('RWeka')
+library(C50)
+library(class)
+library(gmodels)
+```
+
+```{r}
+# Lee el dataset.
+data <-
+  read.csv('data/200630COVID19MEXICO.csv', stringsAsFactors = TRUE)
+```
+
+## Descripción de la base de datos
+
+**ORIGEN:** Identifica si la unidad de atención se encuentra dentro del sistema de Unidades de Salud Monitoras de Enfermedades Respiratorias.
+
+**SECTOR:** Identifica el tipo de institución del Sistema Nacional de Salud que brindó la atención.
+
+**SEXO:** Identifica al sexo del paciente.
+
+**TIPO_PACIENTE:** Identifica si el paciente regresó a su casa o si fue hospitalizado.
+
+**INTUBADO:** Identifica si el paciente requirió intubación.
+
+**NEUMONIA:** Identifica si al paciente se le diagnosticó con neumonía.
+
+**EDAD:** Identifica la edad del paciente.
+
+**EMBARAZO:** Identifica si la paciente está embarazada.
+
+**DIABETES:** Identifica si el paciente tiene un diagnóstico de diabetes.
+
+**EPOC:** Identifica si el paciente tiene un diagnóstico de EPOC.
+
+**ASMA:** Identifica si el paciente tiene un diagnóstico de asma.
+
+**INMUSUPR:** Identifica si el paciente presenta inmunosupresión.
+
+**HIPERTENSION:** Identifica si el paciente tiene un diagnóstico de hipertensión.
+
+**OTRA_COM:** Identifica si el paciente tiene diagnóstico de otras enfermedades.
+
+**CARDIOVASCULAR:** Identifica si el paciente tiene diagnóstico de enfermedades cardiovasculares.
+
+**OBESIDAD:** Identifica si el paciente tiene diagnóstico de obesidad.
+
+**RENAL_CRONICA:** Identifica si el paciente tiene diagnóstico de insuficiencia renal crónica.
+
+**TABAQUISMO:** Identifica si el paciente tiene hábito de tabaquismo.
+
+**OTRO_CASO:** Identifica si el paciente tuvo contacto con algún otro caso diagnósticado con SARS CoV-2
+
+**RESULTADO:** Identifica el resultado de la prueba de Covid-19.
+
+**UCI:** Identifica si el paciente ingresó a una Unidad de Cuidados Intensivos.
+
+**MURIO:** Identifica si el paciente murió.
+
+**DIAS_INGRESO:** Días transcurridos desde que el paciente presentó síntomas, hasta que fue atendido por la unidad médica.
+
+**DIAS_ENFERMEDAD:** Días transcurridos desde que el paciente presentó síntomas, hasta que murió.
+
+**DIAS_HOSPITALIZACION:** Días transcurridos desde que el paciente fue atendido por la unidad médica, hasta que murió
+
+## Metodología
+
+- Búsqueda del dataset.
+
+- Previsualización de los datos.
+
+- Selección y extracción de características.
+
+- Aplicación de algoritmos de Machine Learning.
+
+- Interpretación de resultados.
+
+## Exploración y preparación de los datos
+
+Una vez importado el dataset, se procede a previsualizar su contenido, con la finalidad de ver cómo está compuesto el mismo y qué tipo de información ofrece:
+
+```{r}
+head(data)
+```
+
+```{r}
+summary(data)
+```
+
+Como puede observarse en los resultados de los comandos anteriores, el dataset se compone básicamente de datos categóricos que determinan padecimientos de salud, resultados de la prueba, datos de residencia, etc. Las características categóricas que se incluyen ya vienen codificadas numéricamente, pero aún así, se convierten a factor porque más allá de ver un resumen de sus medidas de tendencia central, es de mayor interés verlo en términos de las apariciones de cada una de sus clases:
+
+```{r}
+data$ORIGEN <- as.factor(data$ORIGEN)
+data$SECTOR <- as.factor(data$SECTOR)
+data$ENTIDAD_UM <- as.factor(data$ENTIDAD_UM)
+data$SEXO <- as.factor(data$SEXO)
+data$ENTIDAD_NAC <- as.factor(data$ENTIDAD_NAC)
+data$ENTIDAD_RES <- as.factor(data$ENTIDAD_RES)
+data$MUNICIPIO_RES <- as.factor(data$MUNICIPIO_RES)
+data$TIPO_PACIENTE <- as.factor(data$TIPO_PACIENTE)
+data$INTUBADO <- as.factor(data$INTUBADO)
+data$NEUMONIA <- as.factor(data$NEUMONIA)
+data$NACIONALIDAD <- as.factor(data$NACIONALIDAD)
+data$EMBARAZO <- as.factor(data$EMBARAZO)
+data$HABLA_LENGUA_INDIG <- as.factor(data$HABLA_LENGUA_INDIG)
+data$DIABETES <- as.factor(data$DIABETES)
+data$EPOC <- as.factor(data$EPOC)
+data$ASMA <- as.factor(data$ASMA)
+data$INMUSUPR <- as.factor(data$INMUSUPR)
+data$HIPERTENSION <- as.factor(data$HIPERTENSION)
+data$OTRA_COM <- as.factor(data$OTRA_COM)
+data$CARDIOVASCULAR <- as.factor(data$CARDIOVASCULAR)
+data$OBESIDAD <- as.factor(data$OBESIDAD)
+data$RENAL_CRONICA <- as.factor(data$RENAL_CRONICA)
+data$TABAQUISMO <- as.factor(data$TABAQUISMO)
+data$OTRO_CASO <- as.factor(data$OTRO_CASO)
+data$RESULTADO <- as.factor(data$RESULTADO)
+data$MIGRANTE <- as.factor(data$MIGRANTE)
+data$UCI <- as.factor(data$UCI)
+```
+
+```{r}
+str(data)
+```
+
+```{r include=FALSE}
+names(data)
+```
+
+```{r}
+summary(data)
+```
+
+```{r}
+nrow(data)
+```
+
+El conjunto de datos contiene 581580 registros, se tiene el conocimiento de la distribución de las clases categóricas y de las fechas donde fueron ocurriendo casos, ingresos a unidad médica y defunciones. En los siguientes apartados se visualiza de manera gráfica algunas de las características.
+
+```{r echo=FALSE, fig.height = 4.5, fig.width = 7 }
+usmer_labels <- c('USMER', 'FUERA DE USMER')
+par(mar = c(3, 5, 4, 1))
+
+barplot(
+  table(data$ORIGEN),
+  main = "USMER",
+  names.arg = usmer_labels,
+  las = 1
+)
+```
+
+```{r echo=FALSE, fig.height = 4.5, fig.width = 7 }
+si_no_labels <- c(
+  'SI', 
+  'NO',
+  'NO APLICA',
+  'NO ESPECIFICADO',
+  'SI', 
+  'NO',
+  'NO ESPECIFICADO',
+  'SI', 
+  'NO',
+  'NO APLICA',
+  'SE IGNORA',
+  'SI', 
+  'NO',
+  'SE IGNORA',
+  'SI', 
+  'NO',
+  'SE IGNORA'
+)
+par(mar = c(9, 5, 4, 6.5), xpd = TRUE)
+
+plotdata = c(
+  table(data$INTUBADO), 
+  table(data$NEUMONIA), 
+  table(data$EMBARAZO),
+  table(data$DIABETES),
+  table(data$EPOC)
+)
+
+colors = c("#264653","#2a9d8f", "#e9c46a", '#f4a261', '#e76f51')
+
+barplot(
+  rbind(plotdata),
+  beside = TRUE,
+  main = "ASPECTOS DE SALUD (1)",
+  col = c(
+    c("#264653","#264653", "#264653", '#264653'),
+    c("#2a9d8f","#2a9d8f", "#2a9d8f"),
+    c("#e9c46a","#e9c46a", "#e9c46a", '#e9c46a'),
+    c("#f4a261","#f4a261", "#f4a261"),
+    c("#e76f51","#e76f51", "#e76f51")
+  ),
+  las = 2,
+  cex.names=0.8,
+  cex.axis=0.8,
+  names.arg = si_no_labels
+)
+
+series = c('INTUBADO', 'NEUMONIA', 'EMBARAZO', 'DIABETES', 'EPOC')
+
+op <- par(cex = 0.8)
+legend('topright', cex=1, series, fill = colors, inset=c(-0.23, 0))
+```
+```{r echo=FALSE, fig.height = 4.5, fig.width = 7 }
+si_no_labels <- c(
+  'SI', 
+  'NO',
+  'SE IGNORA',
+  'SI', 
+  'NO',
+  'SE IGNORA',
+  'SI', 
+  'NO',
+  'SE IGNORA',
+  'SI', 
+  'NO',
+  'SE IGNORA',
+  'SI', 
+  'NO',
+  'SE IGNORA'
+)
+par(mar = c(6, 5, 4, 7), xpd = TRUE)
+
+plotdata = c(
+  table(data$ASMA), 
+  table(data$INMUSUPR), 
+  table(data$HIPERTENSION),
+  table(data$OTRA_COM),
+  table(data$CARDIOVASCULAR)
+)
+
+colors = c("#264653","#2a9d8f", "#e9c46a", '#f4a261', '#e76f51')
+
+barplot(
+  rbind(plotdata),
+  beside = TRUE,
+  main = "ASPECTOS DE SALUD (2)",
+  col = c(
+    c("#264653","#264653", "#264653"),
+    c("#2a9d8f","#2a9d8f", "#2a9d8f"),
+    c("#e9c46a","#e9c46a", "#e9c46a"),
+    c("#f4a261","#f4a261", "#f4a261"),
+    c("#e76f51","#e76f51", "#e76f51")
+  ),
+  las = 2,
+  cex.names=0.8,
+  cex.axis=0.8,
+  names.arg = si_no_labels
+)
+
+series = c('ASMA', 'INMUSUPR', 'HIPERTENSION', 'OTRA_COM', 'CARDIOVASCULAR')
+
+op <- par(cex = 0.7)
+legend('topright', cex=1, series, fill = colors, inset=c(-0.26, 0))
+```
+
+```{r echo=FALSE, fig.height = 4.5, fig.width = 7 }
+si_no_labels <- c(
+  'SI', 
+  'NO',
+  'SE IGNORA',
+  'SI', 
+  'NO',
+  'SE IGNORA',
+  'SI', 
+  'NO',
+  'SE IGNORA',
+  'SI', 
+  'NO',
+  'NO ESPECIFICADO',
+  'SI', 
+  'NO',
+  'NO APLICA',
+  'NO ESPECIFICADO'
+)
+
+par(mar = c(8, 5, 4, 7), xpd = TRUE)
+
+plotdata = c(
+  table(data$OBESIDAD), 
+  table(data$RENAL_CRONICA), 
+  table(data$TABAQUISMO),
+  table(data$OTRO_CASO),
+  table(data$UCI)
+)
+
+colors = c("#264653","#2a9d8f", "#e9c46a", '#f4a261', '#e76f51')
+
+barplot(
+  rbind(plotdata),
+  beside = TRUE,
+  main = "ASPECTOS DE SALUD (3)",
+  col = c(
+    c("#264653","#264653", "#264653"),
+    c("#2a9d8f","#2a9d8f", "#2a9d8f"),
+    c("#e9c46a","#e9c46a", "#e9c46a"),
+    c("#f4a261","#f4a261", "#f4a261"),
+    c("#e76f51","#e76f51", "#e76f51")
+  ),
+  las = 2,
+  cex.names=0.8,
+  cex.axis=0.8,
+  names.arg = si_no_labels
+)
+
+series = c('OBESIDAD', 'RENAL_CRONICA', 'TABAQUISMO', 'OTRO_CASO', 'UCI')
+
+op <- par(cex = 0.7)
+legend('topright', cex=1, series, fill = colors, inset=c(-0.26, 0))
+```
+
+```{r echo=FALSE, fig.height = 4.5, fig.width = 7 }
+sector_labels = c(
+  'CRUZ ROJA',
+  'DIF',
+  'ESTATAL',
+  'IMMS',
+  #'IMSS-BIENESTAR',
+  'ISSSTE',
+  'MUNICIPAL',
+  'PEMEX',
+  'PRIVADA',
+  'SEDENA',
+  'SEMAR',
+  'SSA',
+  'UNIVERSITARIO',
+  'NO ESPECIFICADO'
+)
+
+par(mar = c(10, 5, 4, 1)) # Establece márgenes personalizados.
+
+barplot(
+  height = table(data$SECTOR),
+  main = "INSTITUCIÓN QUE BRINDÓ LA ATENCIÓN",
+  names.arg = sector_labels,
+  las = 2
+)
+```
+
+```{r echo=FALSE, fig.height = 4.5, fig.width = 7 }
+sexo_labels = c('MUJER', 'HOMBRE')
+
+barplot(height = table(data$SEXO),
+        main = "SEXO DEL PACIENTE",
+        names.arg = sexo_labels)
+```
+
+```{r echo=FALSE, fig.height = 4.5, fig.width = 7 }
+tipo_paciente_labels = c('AMBULATORIO', 'HOSPITALIZADO')
+
+barplot(height = table(data$TIPO_PACIENTE), 
+        main = "TIPO DE PACIENTE",
+        names.arg = tipo_paciente_labels)
+```
+
+```{r echo=FALSE, fig.height = 4.5, fig.width = 7 }
+par(mar = c(7, 5, 4, 1))
+
+barplot(height = table(data$FECHA_INGRESO), 
+        main = "FECHA DE INGRESO",
+        las = 2)
+```
+
+```{r echo=FALSE, fig.height = 4.5, fig.width = 7 }
+par(mar = c(7, 5, 4, 1))
+
+barplot(height = table(data$FECHA_SINTOMAS),
+        main = "FECHA DE SÍNTOMAS",
+        las = 2)
+```
+
+
+
+
+```{r echo=FALSE, fig.height = 4.5, fig.width = 7 }
+barplot(height = table(data$EDAD),
+        main = "EDAD")
+```
+
+
+```{r echo=FALSE, fig.height = 4.5, fig.width = 7 }
+resultado_labels = c('POSITIVO', 'NEGATIVO', 'PENDIENTE')
+
+barplot(height = table(data$RESULTADO),
+        main = "RESULTADO",
+        names.arg = resultado_labels)
+```
+
+De acuerdo a las gráficas anteriores es notable que la distribución de las clases no es homogénea alrededor del conjunto de datos, pues los resultados negativos sobre todo en los padecimientos de salud, aforturnadamente la mayoría son negativos. Sin embargo, esto puede afectar al análisis de los datos, más adelante se abordará este problema.
+
+Por otro lado, con base a los intereses del estudio y tomando en cuenta que los datos son de México, se eliminan todas aquellas características que describen el lugar de origen y/o residencia de los pacientes.
+
+```{r}
+data$FECHA_ACTUALIZACION <- NULL
+data$ID_REGISTRO <- NULL
+data$ENTIDAD_UM <- NULL
+data$ENTIDAD_NAC <- NULL
+data$ENTIDAD_RES <- NULL
+data$MUNICIPIO_RES <- NULL
+data$NACIONALIDAD <- NULL
+data$HABLA_LENGUA_INDIG <- NULL
+data$MIGRANTE <- NULL
+data$PAIS_NACIONALIDAD <- NULL
+data$PAIS_ORIGEN <- NULL
+```
+
+```{r}
+summary(data)
+```
+
+```{r}
+names(data)
+```
+
+Después del procesamiento que se le ha dado al dataset, se continúa con el manejo de las fechas, que si bien no se usarán directamente en los algoritmos, servirán de ayuda para obtener otra información importante que sí ayudará al procesamiento.
+
+```{r}
+print('FECHA DE SINTOMAS')
+min(as.character(data$FECHA_SINTOMAS))
+max(as.character(data$FECHA_SINTOMAS))
+
+print('FECHA DE INGRESO')
+min(as.character(data$FECHA_INGRESO))
+max(as.character(data$FECHA_INGRESO))
+
+print('FECHA DE DEFUNCION')
+min(as.character(data$FECHA_DEF))
+max(as.character(data$FECHA_DEF))
+```
+
+De acuerdo a la fecha de defunción se agrega un nuevo campo al dataset que indica de forma binaria si el paciente murió o no.
+
+```{r}
+# Establece si el paciente murió de acuerdo a su fecha de defunción.
+data$MURIO <- data$FECHA_DEF != '9999-99-99'
+data$MURIO <- ifelse(data$MURIO, 1, 2)
+data$MURIO <- as.factor(data$MURIO)
+
+# Muestra resumen de datos agrupando de acuerdo a si el paciente murió o no.
+data %>% split(data$MURIO) %>% map(summary)
+```
+
+El anterior resumen agrupa los resultados de acuerdo al resultado de la muerte del paciente, y cabe destacar que el registro de muertes no corresponden totalmente a pacientes con Coronavirus, sino que de las 37124 muertes, 7158 corresponden a personas cuya prueba resultó negativa, así como 2197 fallecidos que aún están en espera de resultados.
+
+A partir de las fechas de síntomas, ingreso a la unidad médica, y de defunción, se generan tres nuevos valores numéricos: días de ingreso, que indica cuánto tardó el paciente en ingresar a la unidad médica a partir de cuando comenzó con síntomas, así como cuanto tiempo duró desde que presentó síntomas hasta el momento del fallecimiento, etc. Una vez obtenidos estos datos, las categorías de fechas ya no son de utilidad, por lo que se eliminan de la base de datos.
+
+```{r}
+# Parsea las fechas como texto.
+data$FECHA_SINTOMAS <- as.character(data$FECHA_SINTOMAS)
+data$FECHA_INGRESO <- as.character(data$FECHA_INGRESO)
+data$FECHA_DEF <- as.character(data$FECHA_DEF)
+data$FECHA_DEF[data$FECHA_DEF == '9999-99-99'] <- '2019-01-01'
+
+# Parsea las fechas como date.
+data$FECHA_SINTOMAS <- as.Date(data$FECHA_SINTOMAS)
+data$FECHA_INGRESO <- as.Date(data$FECHA_INGRESO)
+data$FECHA_DEF <- as.Date(data$FECHA_DEF)
+
+# Calcula tiempos de la enfermedad.
+data$DIAS_INGRESO <- as.numeric(difftime(data$FECHA_INGRESO, data$FECHA_SINTOMAS)) / 60 / 60 / 24
+data$DIAS_ENFERMEDAD <- as.numeric(difftime(data$FECHA_DEF, data$FECHA_SINTOMAS)) / 60 / 60 / 24
+data$DIAS_HOSPITALIZACION <- as.numeric(difftime(data$FECHA_DEF, data$FECHA_INGRESO)) / 60 / 60 / 24
+
+# Elimina las fechas del dataset.
+data$FECHA_SINTOMAS <- NULL
+data$FECHA_INGRESO <- NULL
+data$FECHA_DEF <- NULL
+```
+
+```{r}
+print('DÍAS DESDE APARICIÓN DE SÍNTOMAS HASTA INGRESO A UNIDAD MÉDICA')
+summary(data$DIAS_INGRESO)
+print('DÍAS DESDE APARICIÓN DE SÍNTOMAS HASTA DEFUNCIÓN')
+summary(data$DIAS_ENFERMEDAD)
+print('DÍAS DE HOSPITALIZACIÓN DEL PACIENTE')
+summary(data$DIAS_HOSPITALIZACION)
+```
+
+```{r}
+data %>% split(data$MURIO) %>% map(summary)
+```
+
+## Generación de modelos
+
+### Balanceo del dataset
+
+Como se mecionó anteriormente, la clase que se predecirá, es decir, si el paciente murió o no, está desbalanceada, ya que la gran mayoría de las personas estudiadas no murieron. Es por ello que es necesario balancear los registros para tener un equilibrio entre las clases de la característica de interés.
+
+El método que se utiliza para balancear el dataset es **undersampling**, por medio del cual se reducen las observaciones de la clase que tiene mayor número de coincidencias y de este modo, los datos quedan equilibrados. Es importante aclarar que no se usó **oversampling**, que prácticamente es lo opuesto del primero porque este último agrega más registros en las clases con menor cantidad de incidencias para equilibrarlas con la más repetida, pero como de por sí el dataset ya es muy grande, agregarle miles de registros más pudiera no ser tan conveniente para el óptimo rendimiento de los algoritmos.
+
+```{r}
+balanced <- downSample(data, data$MURIO)
+```
+
+```{r}
+balanced %>% split(balanced$MURIO) %>% map(summary)
+```
+
+De acuerdo al resultado del resumen generado, el dataset fue reducido para tener 37124 registros de pacientes que murieron y esta misma cantidad para pacientes que siguen vivos.
+
+```{r}
+backup <- balanced
+```
+
+En la tranformación de fechas, se calcularon los días que duró vivo un paciente desde que presentó síntomas, así como lo que duró hospitalizado. Como la mayoría de pacientes no murieron, estas características tienen a tener un valor negativo, lo cual no sería de utilidad para los resultados que se pretenden obtener. Por ahora se decide descartarlas también, sin cerrarse a que posteriormente pudieran tratarse y hacer que realmente sirvan.
+
+Para efectos de pruebas, con el fin de reducir aún más la cantidad de registros, se lleva a cabo un segundo balanceo con respecto al resultado de la prueba de Coronavirus, que es la razón de ser del estudio.
+
+```{r}
+balanced <- backup
+balanced$DIAS_ENFERMEDAD <- NULL
+balanced$DIAS_HOSPITALIZACION <- NULL
+balanced$Class <- NULL
+balanced <- downSample(balanced, balanced$RESULTADO)
+```
+
+```{r}
+nrow(balanced)
+balanced %>% split(balanced$MURIO) %>% map(summary)
+```
+
+### Reglas de clasificación: JRip
+
+```{r}
+covid_jrip <- JRip(MURIO ~ ., data = balanced)
+```
+
+```{r}
+covid_jrip
+```
+
+```{r}
+summary(covid_jrip)
+```
+
+El primer algoritmo implementado fue JRip para reglas de clasificación, por medio de este algoritmo se obtienen una serie de condiciones para llegar a un resultado, ideal para ser usado con la naturaliza de los datos analizados.
+
+El resultado puede decirse que fue bueno, ya que clasificó correctamente el 89% de los registros. Lo único preocupante a partir de estos resultados es el uso que se les pueda dar, ya que por ejemplo, el algoritmo determinó que 681 personas morirían, pero en realidad no fue así. Este dato puede ser desde una simple "buena noticia", hasta una tragedia, ya que como las esperanzas de vida eran pocas según la predicción, es posible que la atención médica se haya otorgado a alguien más, y de esta manera ocasionar más muertes por Covid-19, que de haber sido antendido el paciente, no hubieran ocurrido.
+
+De esta misma manera pueden interpretarse los otros errores, se tienen 1584 pacientes que se determinó que no morirían pero sí ocurrió el fallecimiento. Todo depende de qué resultado erróneo sea más grave, y en base a esto pueden implementarse mejoras al algoritmo.
+
+## Vecinos Cercanos: Knn
+
+```{r}
+# Divide datos en entrenamiento y prueba.
+dt <- sort(sample(nrow(balanced), nrow(balanced) * .7))
+dt_z <- as.data.frame(scale(dt[-1]))
+train <- balanced[dt, ]
+train_labels <- train$MURIO
+test <- balanced[-dt, ]
+test_labels <- test$MURIO
+
+# Elige k
+k <- round(sqrt(nrow(balanced)))
+k <- if (k %% 2) k else k + 1
+k
+```
+
+```{r}
+# Aplica el algoritmo kNN.
+test_pred <- knn(train = train, test = test, 
+                      cl = train_labels, k = k)
+
+# Compara resultados de la predicción en el dataset de prueba.
+CrossTable(x = test_labels, y = test_pred, prop.chisq = FALSE)
+```
+
+El siguiente algoritmo aplicado fue Knn, que para el subconjunto de datos de prueba, el 9% de las predicciones donde se dijo que el paciente iba a morir, no fue así, y por otro lado, el 15% de los pacientes cuyo resultado en la predicción se establecía que no morirían, en realidad sí murieron.
+
+## Árboles de decisión: C5.0
+
+```{r}
+covid_c5 <- C5.0(MURIO ~ ., data = balanced, rules = TRUE)
+```
+
+```{r}
+summary(covid_c5)
+```
+
+En esta ocasión de probó con árboles de decisión por medio del algoritmo C5.0, donde los resultados del entrenamiento arrojan que el 6% de los registros de pacientes que murieron se predijo que sobrevivirían, y el 14% de los que sobrevivieron se había establecido que morirían. Hasta ahora es el algoritmo que ha tenido un mejor rendimiento.
+
+### Naive Bayes
+
+```{r}
+install_missing_packages(c('tm', 'SnowballC', 'wordcloud', 'e1071'))
+
+library(tm)
+library(SnowballC)
+library(wordcloud)
+library(e1071)
+library(gmodels)
+```
+
+```{r}
+# Divide datos en entrenamiento y prueba.
+dt = sort(sample(nrow(balanced), nrow(balanced) * .7))
+train_data <- balanced[dt, ]
+train_labels <- train$MURIO
+test_data <- balanced[-dt, ]
+test_labels <- test$MURIO
+
+# Crea clasificador
+classifier <- naiveBayes(train_data, train_labels)
+
+# Aplica predicción.
+test_pred <- predict(classifier, test_data)
+
+# Compara las predicciones con los valores verdaderos.
+CrossTable(
+  test_pred,
+  test_labels,
+  prop.chisq = FALSE,
+  prop.t = FALSE,
+  dnn = c('predicted', 'actual')
+)
+```
+
+El algoritmo de Naive Bayes no tuvo el desempeño deseado, prácticamente el margen de error es de la mitad, por lo que este método no es el ideal con los datos presentados, y mucho menos tratándose de un tema de salud.
+
+### Regresión lineal
+
+```{r}
+install_missing_packages(c('corrplot', 'psych', 'mnormt'))
+library(corrplot)
+library(psych)
+```
+
+```{r}
+summary(balanced)
+balanced$ORIGEN = as.numeric(balanced$ORIGEN)
+balanced$SECTOR = as.numeric(balanced$SECTOR)
+balanced$SEXO = as.numeric(balanced$SEXO)
+balanced$TIPO_PACIENTE = as.numeric(balanced$TIPO_PACIENTE)
+balanced$NEUMONIA = as.numeric(balanced$NEUMONIA)
+balanced$INTUBADO = as.numeric(balanced$INTUBADO)
+balanced$EDAD = as.numeric(balanced$EDAD)
+balanced$EMBARAZO = as.numeric(balanced$EMBARAZO)
+balanced$DIABETES = as.numeric(balanced$DIABETES)
+balanced$EPOC = as.numeric(balanced$EPOC)
+balanced$ASMA = as.numeric(balanced$ASMA)
+balanced$INMUSUPR = as.numeric(balanced$INMUSUPR)
+balanced$HIPERTENSION = as.numeric(balanced$HIPERTENSION)
+balanced$OTRA_COM = as.numeric(balanced$OTRA_COM)
+balanced$CARDIOVASCULAR = as.numeric(balanced$CARDIOVASCULAR)
+balanced$OBESIDAD = as.numeric(balanced$OBESIDAD)
+balanced$RENAL_CRONICA = as.numeric(balanced$RENAL_CRONICA)
+balanced$TABAQUISMO = as.numeric(balanced$TABAQUISMO)
+balanced$OTRO_CASO = as.numeric(balanced$OTRO_CASO)
+balanced$RESULTADO = as.numeric(balanced$RESULTADO)
+balanced$UCI = as.numeric(balanced$UCI)
+balanced$Class <- NULL
+
+# Divide datos en entrenamiento y prueba.
+dt = sort(sample(nrow(balanced), nrow(balanced) * .7))
+train_data <- balanced[dt, ]
+train_labels <- train$MURIO
+test_data <- balanced[-dt, ]
+test_labels <- test$MURIO
+```
+
+```{r}
+train_data$MURIO = as.numeric(train_data$MURIO)
+test_data$MURIO = as.numeric(test_data$MURIO)
+correlacion = cor(train_data[names(train_data)])
+corrplot(correlacion, method = "color", order = "AOE", tl.cex = 0.6, cl.cex = 0.6)
+correlacion
+```
+
+Para la regresión lineal primeramente se obtuvo un mapa de correlación entre los atributos, a simple vista se puede observar que los padecimientos de salud se encuentrar relacionados entre sí, por lo que se deduce que un padecimiento pudiera conducir a otro, y entre más problemas de salud se tengan, es más probable que un contagio por Covid-19 sea grave.
+
+```{r}
+muerte_model <-
+  lm(
+    MURIO ~ TIPO_PACIENTE + EDAD + NEUMONIA + RESULTADO + SECTOR + INTUBADO + DIABETES + SEXO + HIPERTENSION + OBESIDAD + RENAL_CRONICA + INMUSUPR + TABAQUISMO,
+    data = train_data
+  )
+
+summary(muerte_model)
+```
+
+```{r}
+test_data$predicted <- predict(muerte_model, test_data)
+
+summary(test_data$predicted - test_data$MURIO)
+```
+
+El modelo de regresión se construyo asignando valores numéricos a las categorías, y aunque este pudiera no ser el mejor enfoque, se obtuvo un valor r cuadrada de 0.6217, que si bien no es muy alto, tampoco es inaceptable. Al final se comparan las diferencias entre el valor original y el que se predice y los errores rondan entre -1 y 1, lo cual no dice mucho, ya que las categorías tienen valor numérico de 1, 2, 3, etc. Simplemente esto se interpreta como el cambio de clase que puede resultar de un error.
+
+## Conclusiones
+
+El análisis de datos es una herramienta muy útil para la vida cotidiana actual, donde a cada momento se está generando una cantidad enorme de información. Darle a los datos un procesamiento permite encontrar patrones, relaciones y comportamientos que pueden ayudar a la toma de decisiones y al entendimiento de algún fenómeno.
+
+Como complemento a la tarea anteriormente descrita, los algoritmos de Machine Learning permiten automatizar los cálculos que hay que llevar a cabo para la formulación de conclusiones, cabe destacar que sin este tipo de herramientas sería muy complicado analizar cantidades grandes de datos, ya que la velocidad de procesamiento de los equipos de cómputo permiten llevar a cabo estos análisis de una forma rápida y exacta.
+
+El campo de la medicina es una de las mayores áreas de interés para el análisis de datos, ya que se busca aprovechar las bondades de las ciencias computacionales para mejorar la atención médica que se otorga, incluso para obtener información que a simple vista, sería imposible coseguir.
+
+La implementación de herramientas de análisis de datos aplicadas a situaciones como la actual pandemia por Covid-19, puede ayudar a entender mejor el comportamiento de la enfermedad en un sector de la población. En el presente trabajo se estudiaron los datos correspondientes al seguimiento de los pacientes en México, cuyas características particulares conllevan a que la gravedad de la enfermedad sea diferente en este país que en algún otro.
+
+Por medio de los algoritmos de clasificación utilizados, en especial, del algoritmo C5.0 para árboles de decisión, fue posible determinar con un porcentaje de éxito importante (al rededor del 90%), si un paciente que presentó síntomas de Covid-19, así como con el estudio de otros factores relacionados a su salud, morirá o no.
+
+## Trabajo futuro
+
+En relación al Covid-19 se abre un mar de posibilidades de estudio, en este trabajo se hizo hincapié en los aspectos de salud de un paciente para determinar si morirá o no, pero el descenlace de la enfermedad no se limita a ésto, sino que hay más variables que se pueden analizar para obtener mejores resultados.
+
+Un objetivo de interés es el poder estimar el tiempo en el que un paciente se recuperará o morirá, hecho que ayudaría mucho a la implementación de la logística que se lleva a cabo para sel combate de la enfermedad en cuestión.
+
+Por otro lado, sería conveniente probar con más tipos de algoritmos, sobre todo, determinar qué información arrojaría si se aplican redes neuronales a estos datos. Análisis que por cuestiones de tiempo y del equipo de cómputo con el que se cuenta, fue difícil incluirlo en este trabajo.

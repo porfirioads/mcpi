@@ -1,0 +1,43 @@
+---
+title: "SETTING UP R"
+output:
+  #pdf_document:
+  #  toc: yes
+  html_document:
+    toc: yes
+    theme: united
+---
+
+# INSTALACIÓN DE LOS PAQUETES
+
+Revisa paquetes actualmente instalados:
+
+```{r}
+rownames(installed.packages())
+```
+
+## Instalación de `ReinforcementLearning`
+
+Ejecutar los siguientes comandos en R:
+
+
+```{r}
+install.packages("ReinforcementLearning")
+library(ReinforcementLearning)
+```
+
+## Instalación de `RBM`
+
+```{bash}
+sudo -S apt install libssl-dev
+sudo apt install libcurl4-openssl-dev
+sudo apt install libxml2-dev
+```
+
+```{r}
+install.packages("devtools")
+library(devtools)
+install_github("TimoMatzen/RBM")
+```
+
+

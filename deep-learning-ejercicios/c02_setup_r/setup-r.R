@@ -87,9 +87,9 @@ library(caret)
 
 # Importa dataset de entrenamiento y de prueba, y agrega una columna con
 # etiquetas a cada uno.
-train <- read.csv("../Hands-on-Deep-Learning-with-R-master/Chapter02/B09948_02_Code/adult_processed_train.csv")
+train <- read.csv("c02_setup_r/adult_processed_train.csv")
 train <- train %>% dplyr::mutate(dataset = "train")
-test <- read.csv("../Hands-on-Deep-Learning-with-R-master/Chapter02/B09948_02_Code/adult_processed_test.csv")
+test <- read.csv("c02_setup_r/adult_processed_test.csv")
 test <- test %>% dplyr::mutate(dataset = "test")
 
 # Fusiona los datasets.

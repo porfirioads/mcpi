@@ -19,6 +19,7 @@ install_missing_packages("ReinforcementLearning")
 
 # RBM
 install_missing_packages("usethis")
+# install_missing_packages("rcmdcheck")
 install_missing_packages("devtools")
 library(usethis)
 library(devtools)
@@ -43,10 +44,6 @@ install_missing_packages("keras")
 install_missing_packages("tensorflow")
 library(keras)
 library(tensorflow)
-# FIXME: Ya no es necesario ejecutar las siguientes instrucciones porque ya se
-#        instalaron keras y tensorflow con reticulate.
-# install_keras()
-# install_tensorflow()
 
 # H2O
 if ("package:h2o" %in% search()) { detach("package:h2o", unload = TRUE) }
@@ -57,23 +54,16 @@ for (pkg in pkgs) {
     install.packages(pkg)
   }
 }
-install.packages("h2o", type = "source",
-                 repos = ("http://h2o-release.s3.amazonaws.com/h2o/latest_stable_R"))
+install.packages("h2o", repos=(c("http://s3.amazonaws.com/h2o-release/h2o/master/1497/R", getOption("repos"))))
+library(h2o)
+localH2O = h2o.init()
+demo(h2o.glm)
 
 # MXNet
 cran <- getOption("repos")
 cran["dmlc"] <- "https://apache-mxnet.s3-accelerate.dualstack.amazonaws.com/R/CRAN/"
 options(repos = cran)
 install.packages("mxnet")
-"
-sudo apt-get update
-sudo apt-get install -y build-essential git ninja-build ccache libopenblas-dev libopencv-dev cmake
-git clone --recursive https://github.com/apache/incubator-mxnet
-cd incubator-mxnet
-cmake . -D USE_CUDA=0
-make -j $(nproc) USE_OPENCV=1 USE_BLAS=openblas
-make rpkg
-"
 
 # ------------------------------------------------------
 # PREPARACIÓN DE UN DATASET DE EJEMPLO
@@ -103,12 +93,14 @@ all <- all %>% mutate_if(~is.factor(.), ~trimws(.))
 
 # FIXME: Establece variable objetivo porque la columna 'target' no existe.
 target <- 'income'
+# target <- 'hours.per.week'
 
 # Extrae los datos de entrenamiento
 train <- all %>% filter(dataset == "train")
 
 # Crea el vector target.
-train_target <- as.numeric(factor(train$target))
+train_target <- as.numeric(factor(train[target]))
+# train_target <- factor(train[target])
 
 # Visualiza las variables a usar.
 train
@@ -139,10 +131,6 @@ test_ints <- test %>% select_if(is.integer)
 ohe <- caret::dummyVars(" ~ .", data = test_chars)
 test_ohe <- data.frame(predict(ohe, newdata = test_chars))
 test <- cbind(test_ints, test_ohe)
-
-# Visualiza las variables a usar.
-train
-train_target
 
 # Cambia las variables target de 1 a 2 y 0 a 1.
 train_target <- train_target - 1
@@ -176,10 +164,6 @@ model %>% keras::compile(
   optimizer = 'adam',
   metrics = 'accuracy'
 )
-
-# Visualiza las variables a usar.
-train
-train_target
 
 # ValueError: Input arrays should have the same number of samples as target
 # arrays. Found 32561 input samples and 0 target samples.
@@ -237,8 +221,8 @@ library(h2o)
 h2o::h2o.init()
 
 # load data
-train <- read.csv("adult_processed_train.csv")
-test <- read.csv("adult_processed_test.csv")
+train <- read.csv("c02_setup_r/adult_processed_train.csv")
+test <- read.csv("c02_setup_r/adult_processed_test.csv")
 
 # load data on H2o
 train <- as.h2o(train)
@@ -324,7 +308,3 @@ test_label <- Fashion$testY
 
 # predict using the model
 PredictRBM(test = t(test), labels = test_label, model = rbmModel)
-
-# ------------------------------------------------------
-# COMPARANDO LAS LIBRERÍAS DE DEEP LEARNING
-# ------------------------------------------------------

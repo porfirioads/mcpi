@@ -1,31 +1,6 @@
 # Importa utilidades comunes.
 source('utils/packages.R')
 
-# -----------------------------------------------------------
-# Keras
-install_missing_packages("reticulate")
-library(reticulate)
-install_miniconda(force = TRUE)
-reticulate::use_condaenv("r-reticulate", required = TRUE)
-reticulate::py_config()
-reticulate::conda_install(packages = 'keras')
-reticulate::conda_install(packages = 'tensorflow')
-reticulate::py_module_available('keras')
-reticulate::py_module_available('tensorflow')
-reticulate::conda_list()
-# remove.packages(c("keras", "tensorflow"))
-install_missing_packages(c('keras', 'tensorflow'))
-library(keras)
-library(tensorflow)
-install_keras(
-  method = c("auto", "virtualenv", "conda"),
-  conda = "auto",
-  version = "default",
-  tensorflow = "default",
-  extra_packages = c("tensorflow-hub"),
-)
-# -----------------------------------------------------------
-
 # Instala paquetes.
 install_missing_packages(c(
   'quantmod',
@@ -35,7 +10,8 @@ install_missing_packages(c(
   'forecast',
   'xts',
   'keras',
-  'tensorflow'
+  'tensorflow',
+  'reticulate'
 ))
 
 # Importa librerías.
@@ -47,6 +23,29 @@ library(forecast)
 library(xts)
 library(keras)
 library(tensorflow)
+library(reticulate)
+
+# -----------------------------------------------------------
+# Keras
+install_missing_packages("reticulate")
+install_miniconda(force = TRUE)
+reticulate::use_condaenv("r-reticulate", required = TRUE)
+reticulate::py_config()
+reticulate::conda_install(packages = 'keras')
+reticulate::conda_install(packages = 'tensorflow')
+reticulate::py_module_available('keras')
+reticulate::py_module_available('tensorflow')
+reticulate::conda_list()
+# remove.packages(c("keras", "tensorflow"))
+install_missing_packages(c('keras', 'tensorflow'))
+install_keras(
+  method = c("auto", "virtualenv", "conda"),
+  conda = "auto",
+  version = "default",
+  tensorflow = "default",
+  extra_packages = c("tensorflow-hub"),
+)
+# -----------------------------------------------------------
 
 # Understanding common methods for stock market prediction
 # -----------------------------------------------------------
@@ -124,8 +123,14 @@ model %>%
              input_shape = c(3, 1)) %>%
   layer_dense(units = 1)
 
+# model %>%
+#   compile(loss = 'mse', optimizer = 'adam')
+
 model %>%
-  compile(loss = 'mse', optimizer = 'adam')
+  compile(
+    optimizer = optimizer_adam(learning_rate = 0.001), # learning_rate antes era lr
+    loss = 'mse',
+    metrics = 'accuracy')
 
 model
 
@@ -161,12 +166,15 @@ evaluate_generator(model, train_gen, steps = 1200)
 # Tuning hyperparameters to improve performance
 # -----------------------------------------------------------
 
+# TODO: No pude tunear los parámetros cambiando el parámetro length del
+#       generador, me arrojó una excepción al compilar el modelo.
+
 train_gen <- timeseries_generator(
   closing_deltas,
   closing_deltas,
   length = 10,
   sampling_rate = 1,
-  stride = 1,
+  stride = 10,
   start_index = 1,
   end_index = 1258,
   shuffle = FALSE,
@@ -177,7 +185,7 @@ train_gen <- timeseries_generator(
 test_gen <- timeseries_generator(
   closing_deltas,
   closing_deltas,
-  length = 10,
+  length = 3,
   sampling_rate = 1,
   stride = 1,
   start_index = 1259,
@@ -199,7 +207,7 @@ model %>%
 
 model %>%
   compile(
-    optimizer = optimizer_adam(lr = 0.001),
+    optimizer = optimizer_adam(learning_rate = 0.001), # learning_rate antes era lr
     loss = 'mse',
     metrics = 'accuracy')
 

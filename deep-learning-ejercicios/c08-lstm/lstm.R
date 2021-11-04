@@ -142,7 +142,7 @@ test_gen <- timeseries_generator(
 model <- keras_model_sequential()
 
 # Se agrega la capa LSTM al modelo.
-model %>%S
+model %>%
   layer_lstm(units = 4, # Capas ocultas.
              input_shape = c(3, 1)) %>%
   layer_dense(units = 1)
